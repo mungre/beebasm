@@ -38,7 +38,7 @@ public:
 	SourceFile( const std::string& filename, const SourceCode* parent );
 	virtual ~SourceFile();
 
-	virtual void Process();
+	virtual void Process( ControlFlow* controlFlow );
 };
 
 

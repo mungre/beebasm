@@ -31,6 +31,7 @@
 #include "globaldata.h"
 #include "lineparser.h"
 #include "symboltable.h"
+#include "controlflow.h"
 
 
 using namespace std;
@@ -143,13 +144,13 @@ SourceFile::~SourceFile()
 	Process the associated source file
 */
 /*************************************************************************************************/
-void SourceFile::Process()
+void SourceFile::Process( ControlFlow* controlFlow )
 {
-	SourceCode::Process();
+	SourceCode::Process( controlFlow );
 
 	// Display ok message
 
-	if ( ShouldOutputAsm() )
+	if ( controlFlow->ShouldOutputAsm() )
 	{
 		cerr << "Processed file '" << m_filename << "' ok" << endl;
 	}

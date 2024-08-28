@@ -37,6 +37,7 @@
 #include "macro.h"
 #include "random.h"
 #include "version.h"
+#include "controlflow.h"
 
 
 using namespace std;
@@ -329,8 +330,9 @@ int main( int argc, char* argv[] )
 			ObjectCode::Instance().InitialisePass();
 			GlobalData::Instance().ResetForId();
 			beebasm_srand( static_cast< unsigned long >( randomSeed ) );
+			ControlFlow controlFlow;
 			SourceFile input( pInputFile, 0 );
-			input.Process();
+			controlFlow.Process(&input);
 		}
 	}
 	catch ( AsmException& e )

@@ -31,7 +31,7 @@
 #include "globaldata.h"
 #include "objectcode.h"
 #include "asmexception.h"
-#include "sourcecode.h"
+#include "controlflow.h"
 #include "stringutils.h"
 
 
@@ -236,7 +236,7 @@ void LineParser::Assemble1( int instructionIndex, ADDRESSING_MODE mode )
 {
 	assert( HasAddressingMode( instructionIndex, mode ) );
 
-	if ( m_sourceCode->ShouldOutputAsm() )
+	if ( m_controlFlow->ShouldOutputAsm() )
 	{
 		cout << uppercase << hex << setfill( '0' ) << "     ";
 		cout << setw(4) << ObjectCode::Instance().GetPC() << "   ";
@@ -275,7 +275,7 @@ void LineParser::Assemble2( int instructionIndex, ADDRESSING_MODE mode, unsigned
 	assert( value < 0x100 );
 	assert( HasAddressingMode( instructionIndex, mode ) );
 
-	if ( m_sourceCode->ShouldOutputAsm() )
+	if ( m_controlFlow->ShouldOutputAsm() )
 	{
 		cout << uppercase << hex << setfill( '0' ) << "     ";
 		cout << setw(4) << ObjectCode::Instance().GetPC() << "   ";
@@ -349,7 +349,7 @@ void LineParser::Assemble3( int instructionIndex, ADDRESSING_MODE mode, unsigned
 	assert( value < 0x10000 );
 	assert( HasAddressingMode( instructionIndex, mode ) );
 
-	if ( m_sourceCode->ShouldOutputAsm() )
+	if ( m_controlFlow->ShouldOutputAsm() )
 	{
 		cout << uppercase << hex << setfill( '0' ) << "     ";
 		cout << setw(4) << ObjectCode::Instance().GetPC() << "   ";

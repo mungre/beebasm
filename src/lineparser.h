@@ -26,7 +26,7 @@
 #include <string>
 #include "value.h"
 
-class SourceCode;
+class ControlFlow;
 
 class LineParser
 {
@@ -34,8 +34,8 @@ public:
 
 	// Constructor/destructor
 
-	LineParser( SourceCode* sourceCode, const std::string& line );
-	LineParser( SourceCode* sourceCode );
+	LineParser( ControlFlow* controlFlow, const std::string& line );
+	LineParser( ControlFlow* controlFlow );
 	~LineParser();
 
 	// Process the given line
@@ -48,7 +48,7 @@ public:
 private:
 
 	typedef void ( LineParser::*TokenHandler )();
-	typedef void ( SourceCode::*DirectiveHandler )( const std::string& line, int column );
+	typedef void ( ControlFlow::*DirectiveHandler )( const std::string& line, int column );
 
 	struct Token
 	{
@@ -245,7 +245,7 @@ private:
 
 	Value			FormatAssemblyTime(const char* formatString);
 
-	SourceCode*				m_sourceCode;
+	ControlFlow*			m_controlFlow;
 	std::string				m_line;
 	size_t					m_column;
 

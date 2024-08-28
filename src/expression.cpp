@@ -35,7 +35,7 @@
 #include "symboltable.h"
 #include "globaldata.h"
 #include "objectcode.h"
-#include "sourcefile.h"
+#include "controlflow.h"
 #include "random.h"
 #include "constants.h"
 #include "stringutils.h"
@@ -220,7 +220,7 @@ Value LineParser::GetValue()
 		{
 			// Regular symbol
 
-			if ( !m_sourceCode->GetSymbolValue(symbolName, value) )
+			if ( !m_controlFlow->GetSymbolValue(symbolName, value) )
 			{
 				// symbol not known
 				throw AsmException_SyntaxError_SymbolNotDefined( m_line, oldColumn );
@@ -1508,7 +1508,7 @@ void LineParser::EvalVal()
 void LineParser::EvalEval()
 {
 	String expr = StackTopString();
-	LineParser parser(m_sourceCode, string(expr.Text(), expr.Length()));
+	LineParser parser(m_controlFlow, string(expr.Text(), expr.Length()));
 	Value result = parser.EvaluateExpression();
 	m_valueStack[ m_valueStackPtr - 1 ] = result;
 }

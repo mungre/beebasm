@@ -28,7 +28,7 @@
 #include "stringutils.h"
 #include "symboltable.h"
 #include "globaldata.h"
-#include "sourcefile.h"
+#include "controlflow.h"
 
 
 using namespace std;
@@ -42,15 +42,15 @@ using namespace std;
 	Constructor for LineParser
 */
 /*************************************************************************************************/
-LineParser::LineParser( SourceCode* sourceCode, const string& line )
-	:	m_sourceCode( sourceCode ),
+LineParser::LineParser( ControlFlow* controlFlow, const string& line )
+	:	m_controlFlow( controlFlow ),
 		m_line( line ),
 		m_column( 0 )
 {
 }
 
-LineParser::LineParser( SourceCode* sourceCode )
-	:	m_sourceCode( sourceCode )
+LineParser::LineParser( ControlFlow* controlFlow )
+	:	m_controlFlow( controlFlow )
 {
 }
 
@@ -140,7 +140,7 @@ void LineParser::Process( const string& line )
 
 		// Next we see if we should even be trying to execute anything.... maybe the if condition is false
 
-		if ( !m_sourceCode->IsIfConditionTrue() )
+		if ( !m_controlFlow->IsIfConditionTrue() )
 		{
 			m_column = oldColumn;
 			SkipStatement();
@@ -166,7 +166,7 @@ void LineParser::Process( const string& line )
 			// Deal here with symbol assignment
 			bool bIsConditionalAssignment = false;
 
-			ScopedSymbolName symbolName = m_sourceCode->GetScopedSymbolName( GetSymbolName() );
+			ScopedSymbolName symbolName = m_controlFlow->GetScopedSymbolName( GetSymbolName() );
 
 			if ( !AdvanceAndCheckEndOfStatement() )
 			{
@@ -222,7 +222,7 @@ void LineParser::Process( const string& line )
 			const Macro* macro = MacroTable::Instance().Get( macroName );
 			if ( macro != NULL )
 			{
-				if ( m_sourceCode->ShouldOutputAsm() )
+				if ( m_controlFlow->ShouldOutputAsm() )
 				{
 					cout << "Macro " << macroName << ":" << endl;
 				}
@@ -234,6 +234,8 @@ void LineParser::Process( const string& line )
 				parameterDefined.resize( macro->GetNumberOfParameters() );
 				for ( int i = 0; i < macro->GetNumberOfParameters(); i++ )
 				{
+					ScopedSymbolName paramName = m_controlFlow->GetScopedSymbolName( macro->GetParameter( i ) );
+
 					try
 					{
 						Value value = EvaluateExpression();
@@ -274,7 +276,7 @@ void LineParser::Process( const string& line )
 					// undefinedness to propagate to the macro so that the assembler uses PC as a default.
 					if ( parameterDefined[i] )
 					{
-						ScopedSymbolName paramName = m_sourceCode->GetScopedSymbolName( macro->GetParameter( i ) );
+						ScopedSymbolName paramName = m_controlFlow->GetScopedSymbolName( macro->GetParameter( i ) );
 						if ( !SymbolTable::Instance().IsSymbolDefined( paramName ) )
 						{
 							SymbolTable::Instance().AddSymbol( paramName, parameterValues[i] );
@@ -289,11 +291,11 @@ void LineParser::Process( const string& line )
 				}
 
 				// Run the macro and tidy up
-				MacroInstance macroInstance( macro, m_sourceCode );
-				macroInstance.Process();
+				MacroInstance macroInstance( macro, m_controlFlow->GetCurrentSource() );
+				m_controlFlow->Process( &macroInstance );
 				HandleCloseBrace();
 
-				if ( m_sourceCode->ShouldOutputAsm() )
+				if ( m_controlFlow->ShouldOutputAsm() )
 				{
 					cout << "End macro " << macroName << endl;
 				}
@@ -312,7 +314,7 @@ void LineParser::Process( const string& line )
 	// line numbers to be reported for errors when expanding a macro definition.
 	if ( !bProcessedSomething )
 	{
-		if ( !m_sourceCode->IsIfConditionTrue() )
+		if ( !m_controlFlow->IsIfConditionTrue() )
 		{
 			m_column = 0;
 			SkipStatement();
@@ -371,7 +373,7 @@ void LineParser::SkipStatement()
 		}
 	}
 
-	if ( m_sourceCode->GetCurrentMacro() != NULL )
+	if ( m_controlFlow->GetCurrentMacro() != NULL )
 	{
 		string command = m_line.substr( oldColumn, m_column - oldColumn );
 
@@ -380,7 +382,7 @@ void LineParser::SkipStatement()
 			command += '\n';
 		}
 
-		m_sourceCode->GetCurrentMacro()->AddLine( command );
+		m_controlFlow->GetCurrentMacro()->AddLine( command );
 	}
 }
 
@@ -432,10 +434,10 @@ void LineParser::HandleToken( int i, int oldColumn )
 
 	if ( m_gaTokenTable[ i ].m_directiveHandler )
 	{
-		( m_sourceCode->*m_gaTokenTable[ i ].m_directiveHandler )( m_line, m_column );
+		( m_controlFlow->*m_gaTokenTable[ i ].m_directiveHandler )( m_line, m_column );
 	}
 
-	if ( m_sourceCode->IsIfConditionTrue() )
+	if ( m_controlFlow->IsIfConditionTrue() )
 	{
 		( this->*m_gaTokenTable[ i ].m_handler )();
 	}

@@ -62,10 +62,6 @@ MacroInstance::MacroInstance( const Macro* macro, const SourceCode* sourceCode )
 		//,m_macro( macro )
 {
 //	cout << "Instance macro: " << m_macro->GetName() << " (" << m_filename << ":" << m_lineNumber << ")" << endl;
-
-	// Copy FOR stack from the parent
-
-	CopyForStack( sourceCode );
 }
 
 

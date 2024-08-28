@@ -93,6 +93,7 @@
     <ClCompile Include="..\random.cpp" />
     <ClCompile Include="..\sourcecode.cpp" />
     <ClCompile Include="..\sourcefile.cpp" />
+    <ClCompile Include="..\controlflow.cpp" />
     <ClCompile Include="..\stringutils.cpp" />
     <ClCompile Include="..\symboltable.cpp" />
     <ClCompile Include="..\basic_tokenize.cpp" />
@@ -112,6 +113,7 @@
     <ClInclude Include="..\scopedsymbolname.h" />
     <ClInclude Include="..\sourcecode.h" />
     <ClInclude Include="..\sourcefile.h" />
+    <ClInclude Include="..\controlflow.h" />
     <ClInclude Include="..\stringutils.h" />
     <ClInclude Include="..\symboltable.h" />
     <ClInclude Include="..\basic_tokenize.h" />

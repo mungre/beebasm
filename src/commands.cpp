@@ -36,7 +36,7 @@
 #include "objectcode.h"
 #include "stringutils.h"
 #include "symboltable.h"
-#include "sourcefile.h"
+#include "controlflow.h"
 #include "asmexception.h"
 #include "discimage.h"
 #include "basic_tokenize.h"
@@ -66,10 +66,10 @@ const LineParser::Token	LineParser::m_gaTokenTable[] =
 	{ N("SAVE"),		&LineParser::HandleSave,				0 },
 	{ N("FOR"),			&LineParser::HandleFor,					0 },
 	{ N("NEXT"),		&LineParser::HandleNext,				0 },
-	{ N("IF"),			&LineParser::HandleIf,					&SourceFile::AddIfLevel },
-	{ N("ELIF"),		&LineParser::HandleIf,					&SourceFile::StartElif },
-	{ N("ELSE"),		&LineParser::HandleDirective,			&SourceFile::StartElse },
-	{ N("ENDIF"),		&LineParser::HandleDirective,			&SourceFile::RemoveIfLevel },
+	{ N("IF"),			&LineParser::HandleIf,					&ControlFlow::AddIfLevel },
+	{ N("ELIF"),		&LineParser::HandleIf,					&ControlFlow::StartElif },
+	{ N("ELSE"),		&LineParser::HandleDirective,			&ControlFlow::StartElse },
+	{ N("ENDIF"),		&LineParser::HandleDirective,			&ControlFlow::RemoveIfLevel },
 	{ N("ALIGN"),		&LineParser::HandleAlign,				0 },
 	{ N("SKIPTO"),		&LineParser::HandleSkipTo,				0 },
 	{ N("SKIP"),		&LineParser::HandleSkip,				0 },
@@ -82,8 +82,8 @@ const LineParser::Token	LineParser::m_gaTokenTable[] =
 	{ N("PUTFILE"),		&LineParser::HandlePutFile,				0 },
 	{ N("PUTTEXT"),		&LineParser::HandlePutText,				0 },
 	{ N("PUTBASIC"),	&LineParser::HandlePutBasic,			0 },
-	{ N("MACRO"),		&LineParser::HandleMacro,				&SourceFile::StartMacro },
-	{ N("ENDMACRO"),	&LineParser::HandleEndMacro,			&SourceFile::EndMacro },
+	{ N("MACRO"),		&LineParser::HandleMacro,				&ControlFlow::StartMacro },
+	{ N("ENDMACRO"),	&LineParser::HandleEndMacro,			&ControlFlow::EndMacro },
 	{ N("ERROR"),		&LineParser::HandleError,				0 },
 	{ N("COPYBLOCK"),	&LineParser::HandleCopyBlock,			0 },
 	{ N("RANDOMIZE"),	&LineParser::HandleRandomize,			0 },
@@ -464,7 +464,7 @@ void LineParser::HandleDefineLabel()
 
         int initialColumn = m_column;
         char first_char = m_line[ m_column ];
-        int target_level = m_sourceCode->GetForLevel();
+        int target_level = m_controlFlow->GetForLevel();
         if (first_char == '*')
         {
                 m_column++;
@@ -477,16 +477,16 @@ void LineParser::HandleDefineLabel()
         }
 
         // '*' and '^' may not cause a label to be defined outside the current macro expansion.
-        if ( target_level < m_sourceCode->GetInitialForStackPtr() )
+        if ( target_level < m_controlFlow->GetCurrentSource()->GetInitialForStackPtr() )
         {
                 throw AsmException_SyntaxError_SymbolScopeOutsideMacro( m_line, initialColumn );
         }
 
         // '*' and '^' may not cause a label to be defined outside the current for loop; note that
         // this loop is a no-op for ordinary labels where target_level == m_sourceCode->GetForLevel().
-        for ( int level = m_sourceCode->GetForLevel(); level > target_level; level-- )
+        for ( int level = m_controlFlow->GetForLevel(); level > target_level; level-- )
         {
-                if ( m_sourceCode->IsRealForLevel( level ) )
+                if ( m_controlFlow->IsRealForLevel( level ) )
                 {
                         throw AsmException_SyntaxError_SymbolScopeOutsideFor( m_line, initialColumn );
                 }
@@ -504,7 +504,7 @@ void LineParser::HandleDefineLabel()
 
 		// ...and apply the current scope
 
-		ScopedSymbolName fullSymbolName = m_sourceCode->GetScopedSymbolName( symbolName, target_level );
+		ScopedSymbolName fullSymbolName = m_controlFlow->GetScopedSymbolName( symbolName, target_level );
 
 		if ( GlobalData::Instance().IsFirstPass() )
 		{
@@ -532,7 +532,7 @@ void LineParser::HandleDefineLabel()
 			SymbolTable::Instance().AddLabel(symbolName);
 		}
 
-		if ( m_sourceCode->ShouldOutputAsm() )
+		if ( m_controlFlow->ShouldOutputAsm() )
 		{
 			cout << "." << symbolName << endl;
 		}
@@ -751,7 +751,7 @@ void LineParser::HandleSkip()
 		throw AsmException_SyntaxError_ImmNegative( m_line, oldColumn );
 	}
 
-	if ( m_sourceCode->ShouldOutputAsm() )
+	if ( m_controlFlow->ShouldOutputAsm() )
 	{
 		cout << uppercase << hex << setfill( '0' ) << "     ";
 		cout << setw(4) << ObjectCode::Instance().GetPC() << endl;
@@ -820,7 +820,7 @@ void LineParser::HandleSkipTo()
 /*************************************************************************************************/
 void LineParser::HandleInclude()
 {
-	if ( m_sourceCode->GetForLevel() > 0 )
+	if ( m_controlFlow->GetForLevel() > 0 )
 	{
 		// disallow an include within a FOR loop
 		throw AsmException_SyntaxError_CantInclude( m_line, m_column );
@@ -828,18 +828,12 @@ void LineParser::HandleInclude()
 
 	string filename = EvaluateExpressionAsString();
 
-	if ( m_sourceCode->ShouldOutputAsm() )
-	{
-		cerr << "Including file " << filename << endl;
-	}
-
-	SourceFile input( filename.c_str(), m_sourceCode );
-	input.Process();
-
 	if ( AdvanceAndCheckEndOfStatement() )
 	{
 		throw AsmException_SyntaxError_InvalidCharacter( m_line, m_column );
 	}
+
+	m_controlFlow->IncludeFile( filename );
 }
 
 
@@ -853,7 +847,7 @@ void LineParser::HandleIncBin()
 {
 	string filename = EvaluateExpressionAsString();
 
-	if ( m_sourceCode->ShouldOutputAsm() )
+	if ( m_controlFlow->ShouldOutputAsm() )
 	{
 		cout << uppercase << hex << setfill( '0' ) << "     ";
 		cout << setw(4) << ObjectCode::Instance().GetPC() << "   ";
@@ -871,7 +865,7 @@ void LineParser::HandleIncBin()
 		throw;
 	}
 
-	if ( m_sourceCode->ShouldOutputAsm() )
+	if ( m_controlFlow->ShouldOutputAsm() )
 	{
 		size_t count = 0;
 		for ( size_t i = 0; i < firstFour.size(); i++ )
@@ -932,7 +926,7 @@ void LineParser::HandleEqub()
 				throw AsmException_SyntaxError_NumberTooBig( m_line, m_column );
 			}
 
-			if ( m_sourceCode->ShouldOutputAsm() )
+			if ( m_controlFlow->ShouldOutputAsm() )
 			{
 				cout << uppercase << hex << setfill( '0' ) << "     ";
 				cout << setw(4) << ObjectCode::Instance().GetPC() << "   ";
@@ -977,7 +971,7 @@ void LineParser::HandleEqub()
 /*************************************************************************************************/
 void LineParser::HandleEqus( const String& equs )
 {
-	if ( m_sourceCode->ShouldOutputAsm() )
+	if ( m_controlFlow->ShouldOutputAsm() )
 	{
 		cout << uppercase << hex << setfill( '0' ) << "     ";
 		cout << setw(4) << ObjectCode::Instance().GetPC() << "   ";
@@ -987,7 +981,7 @@ void LineParser::HandleEqus( const String& equs )
 	{
 		int mappedchar = ObjectCode::Instance().GetMapping( equs[ i ] );
 
-		if ( m_sourceCode->ShouldOutputAsm() )
+		if ( m_controlFlow->ShouldOutputAsm() )
 		{
 			if ( i < 3 )
 			{
@@ -1012,7 +1006,7 @@ void LineParser::HandleEqus( const String& equs )
 		}
 	}
 
-	if ( m_sourceCode->ShouldOutputAsm() )
+	if ( m_controlFlow->ShouldOutputAsm() )
 	{
 		cout << endl << nouppercase << dec << setfill( ' ' );
 	}
@@ -1033,7 +1027,7 @@ void LineParser::HandleEquw()
 
 	do
 	{
-		if ( m_sourceCode->ShouldOutputAsm() )
+		if ( m_controlFlow->ShouldOutputAsm() )
 		{
 			cout << uppercase << hex << setfill( '0' ) << "     ";
 			cout << setw(4) << ObjectCode::Instance().GetPC() << "   ";
@@ -1080,7 +1074,7 @@ void LineParser::HandleEqud()
 
 	do
 	{
-		if ( m_sourceCode->ShouldOutputAsm() )
+		if ( m_controlFlow->ShouldOutputAsm() )
 		{
 			cout << uppercase << hex << setfill( '0' ) << "     ";
 			cout << setw(4) << ObjectCode::Instance().GetPC() << "   ";
@@ -1222,7 +1216,7 @@ void LineParser::HandleSave()
 		}
 	}
 
-	if ( m_sourceCode->ShouldOutputAsm() )
+	if ( m_controlFlow->ShouldOutputAsm() )
 	{
 		cout << "Saving file '" << saveFile << "'" << endl;
 	}
@@ -1291,7 +1285,7 @@ void LineParser::HandleFor()
 	// Symbol starts with a valid character
 
 	int oldColumn = m_column;
-	ScopedSymbolName symbolName = m_sourceCode->GetScopedSymbolName( GetSymbolName() );
+	ScopedSymbolName symbolName = m_controlFlow->GetScopedSymbolName( GetSymbolName() );
 
 	// Check variable has not yet been defined
 
@@ -1311,11 +1305,11 @@ void LineParser::HandleFor()
 		throw AsmException_SyntaxError_BadStep( m_line, m_column );
 	}
 
-	m_sourceCode->AddFor( symbolName,
+	m_controlFlow->AddFor( symbolName,
 						  start, end, step,
-						  m_sourceCode->GetLineStartPointer() + m_column,
 						  m_line,
-						  oldColumn );
+						  oldColumn,
+						  m_column );
 }
 
 
@@ -1327,7 +1321,7 @@ void LineParser::HandleFor()
 /*************************************************************************************************/
 void LineParser::HandleOpenBrace()
 {
-	m_sourceCode->OpenBrace( m_line, m_column - 1 );
+	m_controlFlow->OpenBrace( m_line, m_column - 1 );
 }
 
 
@@ -1347,7 +1341,7 @@ void LineParser::HandleNext()
 		throw AsmException_SyntaxError_InvalidCharacter( m_line, m_column );
 	}
 
-	m_sourceCode->UpdateFor( m_line, oldColumn );
+	m_controlFlow->UpdateFor( m_line, oldColumn );
 }
 
 
@@ -1361,7 +1355,7 @@ void LineParser::HandleNext()
 /*************************************************************************************************/
 void LineParser::HandleCloseBrace()
 {
-	m_sourceCode->CloseBrace( m_line, m_column - 1 );
+	m_controlFlow->CloseBrace( m_line, m_column - 1 );
 }
 
 
@@ -1375,7 +1369,7 @@ void LineParser::HandleIf()
 {
 	// Handles both IF and ELIF
 	bool condition = (EvaluateExpressionAsInt() != 0);
-	m_sourceCode->SetCurrentIfCondition( condition );
+	m_controlFlow->SetCurrentIfCondition( condition );
 
 	if ( m_column < m_line.length() && m_line[ m_column ] == ',' )
 	{
@@ -1456,7 +1450,7 @@ void LineParser::HandlePrint()
 			{
 				if ( !GlobalData::Instance().IsFirstPass() )
 				{
-					cout << StringUtils::FormattedErrorLocation( m_sourceCode->GetFilename(), m_sourceCode->GetLineNumber() );
+					cout << StringUtils::FormattedErrorLocation( m_controlFlow->GetCurrentSource()->GetFilename(), m_controlFlow->GetCurrentSource()->GetLineNumber() );
 				}
 				m_column += filelineKeywordLength ;
 			}
@@ -1464,8 +1458,8 @@ void LineParser::HandlePrint()
 			{
 				if ( !GlobalData::Instance().IsFirstPass() )
 				{
-					cout << StringUtils::FormattedErrorLocation( m_sourceCode->GetFilename(), m_sourceCode->GetLineNumber() );
-					for ( const SourceCode* s = m_sourceCode->GetParent(); s; s = s->GetParent() )
+					cout << StringUtils::FormattedErrorLocation( m_controlFlow->GetCurrentSource()->GetFilename(), m_controlFlow->GetCurrentSource()->GetLineNumber() );
+					for ( const SourceCode* s = m_controlFlow->GetCurrentSource()->GetParent(); s; s = s->GetParent() )
 					{
 						cout << endl << StringUtils::FormattedErrorLocation( s->GetFilename(), s->GetLineNumber() );
 					}
@@ -1696,7 +1690,7 @@ void LineParser::HandleMacro()
 				throw AsmException_SyntaxError_DuplicateMacroName( m_line, m_column );
 			}
 
-			m_sourceCode->GetCurrentMacro()->SetName( macroName );
+			m_controlFlow->GetCurrentMacro()->SetName( macroName );
 		}
 	}
 	else
@@ -1727,7 +1721,7 @@ void LineParser::HandleMacro()
 
 			if ( GlobalData::Instance().IsFirstPass() )
 			{
-				m_sourceCode->GetCurrentMacro()->AddParameter( param );
+				m_controlFlow->GetCurrentMacro()->AddParameter( param );
 			}
 			bExpectComma = true;
 			bHasParameters = true;
@@ -1749,13 +1743,13 @@ void LineParser::HandleMacro()
 	if ( m_column == m_line.length() &&
 		 GlobalData::Instance().IsFirstPass() )
 	{
-		m_sourceCode->GetCurrentMacro()->AddLine("\n");
+		m_controlFlow->GetCurrentMacro()->AddLine("\n");
 	}
 
 	// Set the IF condition to false - this is a cheaty way of ensuring that the macro body
 	// is not assembled as it is parsed
 
-	m_sourceCode->SetCurrentIfCondition(false);
+	m_controlFlow->SetCurrentIfCondition(false);
 }
 
 
@@ -1878,7 +1872,7 @@ void LineParser::HandleAsm()
 		throw AsmException_SyntaxError_InvalidCharacter( m_line, m_column );
 	}
 
-	LineParser parser(m_sourceCode, assembly);
+	LineParser parser(m_controlFlow, assembly);
 
 	// Parse the mnemonic, don't require a non-alpha after it.
 	int instruction = parser.GetInstructionAndAdvanceColumn(false);
@@ -1908,9 +1902,9 @@ void LineParser::HandleSourceLine()
 		throw AsmException_SyntaxError_SourceLineNotLast( m_line, m_column );
 	}
 
-	m_sourceCode->SetLineNumber(line - 1);
+	m_controlFlow->SetLineNumber(line - 1);
 	if (fileParam.Found())
 	{
-		m_sourceCode->SetFileName(static_cast<string>(fileParam));
+		m_controlFlow->SetFileName(static_cast<string>(fileParam));
 	}
 }
