@@ -1,0 +1,4 @@
+IF TRUE
+LDA #2
+ELSE
+LDA #3

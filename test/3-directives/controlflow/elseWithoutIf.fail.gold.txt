@@ -1,0 +1,1 @@
+elseWithoutIf.fail.6502:2: error: ELSE without IF.

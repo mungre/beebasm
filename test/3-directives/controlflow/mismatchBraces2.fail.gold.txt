@@ -1,0 +1,1 @@
+mismatchBraces2.fail.6502:2: error: Mismatched braces.

@@ -1,0 +1,1 @@
+nextWithoutFor.fail.6502:2: error: NEXT without FOR.

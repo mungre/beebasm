@@ -1,0 +1,1 @@
+cantInclude.fail.6502:2: error: Cannot include a source file within a FOR loop or braced block.

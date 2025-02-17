@@ -1,0 +1,1 @@
+endifWithoutIf.fail.6502:2: error: ENDIF without IF.
