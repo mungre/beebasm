@@ -369,7 +369,7 @@ void ControlFlow::SetCurrentIfCondition( bool b )
 /*************************************************************************************************/
 void ControlFlow::StartElse( const string& line, int column )
 {
-	if ( m_ifStack[ m_ifStackPtr - 1 ].m_hadElse )
+	if ( !m_ifStackPtr || m_ifStack[ m_ifStackPtr - 1 ].m_hadElse )
 	{
 		throw AsmException_SyntaxError_ElseWithoutIf( line, column );
 	}
@@ -388,7 +388,7 @@ void ControlFlow::StartElse( const string& line, int column )
 /*************************************************************************************************/
 void ControlFlow::StartElif( const string& line, int column )
 {
-	if ( m_ifStack[ m_ifStackPtr - 1 ].m_hadElse )
+	if ( !m_ifStackPtr || m_ifStack[ m_ifStackPtr - 1 ].m_hadElse )
 	{
 		throw AsmException_SyntaxError_ElifWithoutIf( line, column );
 	}
